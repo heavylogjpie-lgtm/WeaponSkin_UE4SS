@@ -1,20 +1,11 @@
-v2
+v2:
 
-Fixed a hard crash on the newest experimental UE4SS builds. Pressing Equip/Remove in the
-weapon menu killed the game instantly. Older UE4SS builds were unaffected, so this only hit
-people who had updated.
+Fixed a hard crash on the newest experimental UE4SS builds. Pressing Equip/Remove in the weapon menu killed the game instantly. Older UE4SS builds were unaffected
 
-The cause was the mod reading the skin reference off the weapon at runtime. The new UE4SS
-changed how that kind of reference is stored internally. v2 no longer reads it at all -
-skin paths now come from a list built from the game's own weapon data. Tested working on
-both the UE4SS build linked on the mod page and the latest experimental one.
+Issue traced to mod reading the skin reference off the weapon at runtime. Latest UE4SS build changed how that kind of reference is stored internally. v2 no longer reads it at all. Skin paths now come from a list built from the game's own weapon data.
 
-Also fixed two Verso weapons, Velokan and Mitigated Perfection, that applied no skin at
-all. Their weapon data sits in a different folder from every other weapon and was being
-skipped when the skin list was built.
+On request, added two Verso weapons to list, Velokan and Mitigated Perfection. Neither is obtainable in vanilla and even if you mod them to be obtainable they only use Versos default skin. But if you still want to, they should now behave like any other weapon, with the caveat that I haven't tested that personally
 
-Also removed the extra logging that was added while tracking the crash down.
+v1:
 
-v1
-
-Initial release.
+Initial release
