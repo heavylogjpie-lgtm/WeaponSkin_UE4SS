@@ -1,4 +1,4 @@
-Weapon Skin/Glam v2
+Weapon Skin/Glam v3
 Heavylog8
 
 Player keeps the stats of the equipped weapon and overrides its on screen model with a different weapon they own. Set/unset from the in-game weapon menu.

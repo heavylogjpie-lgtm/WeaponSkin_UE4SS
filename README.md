@@ -1,4 +1,4 @@
-WeaponSkin_UE4SS  (v2)
+WeaponSkin_UE4SS  (v3)
 ======================
 
 Requires UE4SS. Copy this folder to:
@@ -7,8 +7,11 @@ Requires UE4SS. Copy this folder to:
 
 Keep a weapon's stats, override its model with another weapon you own.
 
+Keyboard: Equip / Remove is V (retail S is also move-down in this menu).
+Controller is unchanged.
+
 Do not install with WeaponSkin_Patch.
 
-See readme.txt for player notes and changelog.txt for what changed in v2.
+See readme.txt for player notes and changelog.txt for what changed in v3.
 
 DEBUG is the first line of Scripts/main.lua.

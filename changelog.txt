@@ -1,3 +1,7 @@
+v3:
+
+Keyboard now uses V, which is not used by any other CommonUI action. The prompt shows (V) on keyboard; controller is unchanged.
+
 v2:
 
 Fixed a hard crash on the newest experimental UE4SS builds. Pressing Equip/Remove in the weapon menu killed the game instantly. Older UE4SS builds were unaffected

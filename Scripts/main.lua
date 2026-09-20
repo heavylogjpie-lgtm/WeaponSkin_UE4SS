@@ -41,6 +41,9 @@ local UIHELPERS_CDO = "/Game/UI/FL_UIHelpers.Default__FL_UIHelpers_C"
 local EQUIP_SOUND_PATH =
     "/Game/Audio/MetaSound/SFX/UI/RestMenu/SFX_UI_RestMenu_Skill_Equip.SFX_UI_RestMenu_Skill_Equip"
 local HIDE_ACTION_ROW = "CommonUI_GameMenu_HideTooltip"
+-- Retail binds HideTooltip to S. WASD-down consumes S, so KBM couldnt use the equip/remove button.
+-- V is unused in DT_CommonUIActionComposite.
+local GLAM_KB_KEY = "V"
 local APPLY_DELAY_MS = 0
 local RESOLVE_RETRY_MS = 0
 
@@ -230,6 +233,8 @@ local apply_ok = {}
 local equipped_path = {}
 local last_scene = nil
 local last_panel = nil
+local panel_open = false
+local input_subsys = nil
 local retry_pending = {}
 local tooltip_suppressed = false
 local tooltip_hide_n = 0
@@ -1605,6 +1610,83 @@ local function label_for_row(panel)
     return LABEL_EQUIP
 end
 
+local function first_live(list)
+    if is_live(list) then
+        return list
+    end
+    if type(list) ~= "table" then
+        return nil
+    end
+    for i = 1, #list do
+        if is_live(list[i]) then
+            return list[i]
+        end
+    end
+    for _, v in pairs(list) do
+        if is_live(v) then
+            return v
+        end
+    end
+    return nil
+end
+
+local function get_input_subsys()
+    if is_live(input_subsys) then
+        return input_subsys
+    end
+    input_subsys = nil
+    if type(FindAllOf) ~= "function" then
+        return nil
+    end
+    local ok, list = pcall(FindAllOf, "CommonInputSubsystem")
+    if not ok then
+        return nil
+    end
+    input_subsys = first_live(list)
+    return input_subsys
+end
+
+local function using_gamepad()
+    local sub = get_input_subsys()
+    if not is_live(sub) then
+        return false
+    end
+    local t = safe_call(sub, "GetCurrentInputType")
+    if t == nil or t == 0 then
+        return false
+    end
+    if t == 1 then
+        return true
+    end
+    local s = tostring(t)
+    return type(s) == "string" and s:find("Gamepad", 1, true) ~= nil
+end
+
+local function paint_keyboard_glyph(btn)
+    if not is_live(btn) or using_gamepad() then
+        return
+    end
+    local binding = safe_get(btn, "InputActionBinding")
+    if not is_live(binding) then
+        return
+    end
+    local keywid = safe_get(binding, "UniversalKeyboardKey")
+    if not is_live(keywid) then
+        return
+    end
+    local text = safe_get(keywid, "Text")
+    if not is_live(text) then
+        return
+    end
+    local ftext = as_ftext(GLAM_KB_KEY)
+    if ftext == nil then
+        return
+    end
+    pcall(function()
+        text:SetText(ftext)
+    end)
+end
+
 local function set_text_override(btn, text)
     if not is_live(btn) then
         return false, "dead"
@@ -1632,6 +1714,9 @@ end
 local function apply_hide_button_text(panel, text, why, maybe_bar)
     if not is_live(panel) then
         return
+    end
+    if text ~= LABEL_RETAIL and not using_gamepad() then
+        text = text .. " (" .. GLAM_KB_KEY .. ")"
     end
     local bar = action_bar_from(panel, maybe_bar)
     local src = hide_tooltip_button(panel)
@@ -1699,12 +1784,19 @@ local function apply_hide_button_text(panel, text, why, maybe_bar)
     end
     local ok, err = true, nil
     local last_btn = nil
+    local paint_glyph = text ~= LABEL_RETAIL
     for i = 1, #targets do
         last_btn = targets[i]
         local one_ok, one_err = set_text_override(last_btn, text)
         if not one_ok then
             ok, err = one_ok, one_err
         end
+        if paint_glyph then
+            paint_keyboard_glyph(last_btn)
+        end
+    end
+    if paint_glyph then
+        paint_keyboard_glyph(src)
     end
     label_n = label_n + 1
     local changed = text ~= last_label
@@ -1895,6 +1987,7 @@ local function on_hide_tooltip(ctx)
     last.hide_n = last.hide_n + 1
     local panel = unwrap(ctx)
     last_panel = panel
+    panel_open = true
     local char, char_data = character_id(panel)
     last.char = char
     log("=== HideTooltip #" .. last.hide_n .. " ===")
@@ -1954,6 +2047,7 @@ local function on_weapon_navigated(ctx, p_item)
     last.nav_n = last.nav_n + 1
     local panel = unwrap(ctx)
     last_panel = panel
+    panel_open = true
     local char = character_id(panel)
     last.char = char
     local item_obj = unwrap(p_item)
@@ -1991,12 +2085,15 @@ end
 
 local function on_panel_deactivated(ctx)
     local panel = unwrap(ctx)
+    panel_open = false
     restore_hide_button_label(panel, "BP_OnDeactivated")
     clear_tooltip_suppress(panel, "BP_OnDeactivated")
 end
 
 local function on_panel_activated(ctx)
     local panel = unwrap(ctx)
+    last_panel = panel
+    panel_open = true
     log("=== BP_OnActivated enter game_thread=" .. thread_tag())
     clear_tooltip_suppress(panel, "BP_OnActivated")
     relabel_hide_button(panel, "BP_OnActivated")
@@ -2125,7 +2222,7 @@ local function register_hooks()
         end
     end
     if missing == 0 then
-        say("v2 ready, " .. #HOOKS .. " hooks")
+        say("v3 ready, " .. #HOOKS .. " hooks, KBM=" .. GLAM_KB_KEY)
         return
     end
     if attempts >= MAX_ATTEMPTS then
@@ -2194,6 +2291,57 @@ else
 end
 if type(ExecuteWithDelay) == "function" then
     ExecuteWithDelay(RETRY_MS, arm_battle_ready)
+end
+
+local function on_kb_glam()
+    if not panel_open or not is_live(last_panel) then
+        return
+    end
+    if safe_get(last_panel, "IsBlacksmithMode") == true then
+        return
+    end
+    local panel = last_panel
+    local queued = schedule(0, function()
+        if not panel_open or not is_live(panel) then
+            return
+        end
+        if safe_get(panel, "IsBlacksmithMode") == true then
+            return
+        end
+        on_hide_tooltip(panel)
+    end)
+    if not queued then
+        on_hide_tooltip(panel)
+    end
+end
+
+local kb = nil
+if type(Key) == "table" then
+    kb = Key[GLAM_KB_KEY] or Key.V
+end
+if type(RegisterKeyBind) == "function" and kb ~= nil then
+    local ok_kb = pcall(RegisterKeyBind, kb, on_kb_glam)
+    if ok_kb then
+        log("keybind OK  " .. GLAM_KB_KEY)
+    else
+        say("WARN keyboard bind for " .. GLAM_KB_KEY .. " failed; controller Equip/Remove still works")
+    end
+elseif type(RegisterKeyBind) ~= "function" then
+    say("WARN RegisterKeyBind missing; KBM Equip/Remove cannot bypass the S/down conflict")
+end
+
+local INPUT_TYPE_PATH = "/Script/CommonInput.CommonInputSubsystem:SetCurrentInputType"
+local ok_it = pcall(RegisterHook, INPUT_TYPE_PATH, function() end, function()
+    if not panel_open or not is_live(last_panel) then
+        return
+    end
+    if safe_get(last_panel, "IsBlacksmithMode") == true then
+        return
+    end
+    relabel_hide_button(last_panel, "input-type")
+end)
+if ok_it then
+    log("hook OK   " .. INPUT_TYPE_PATH)
 end
 
 if type(RegisterConsoleCommandHandler) == "function" then
